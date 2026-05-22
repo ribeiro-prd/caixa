@@ -19,6 +19,7 @@ from caixa_joias.exports.excel import write_analysis_excel
 from caixa_joias.parsers.catalogo_pdf import parse_catalog_pdf
 from caixa_joias.parsers.resultado_pdf import parse_results_pdf
 from caixa_joias.parsers.history_catalogs import parse_history_catalogs
+from caixa_joias.parsers.pdf_inventory import build_pdf_inventory
 from caixa_joias.exports.opportunity_report import build_report
 from caixa_joias.scrapers.caixa.download_history import build_history
 
@@ -280,4 +281,11 @@ def parse_history_catalogs_command(
         out_csv=out_csv,
         out_summary_csv=summary_csv,
     )
+
+@app.command("pdf-inventory")
+def pdf_inventory_command(
+    history_dir: Path = typer.Option(..., "--history-dir"),
+    out_csv: Path = typer.Option(Path("data/processed/pdf_inventory.csv"), "--out-csv"),
+) -> None:
+    build_pdf_inventory(history_dir=history_dir, out_csv=out_csv)
 
