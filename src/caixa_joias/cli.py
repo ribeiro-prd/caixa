@@ -18,6 +18,7 @@ from caixa_joias.core.scoring import add_basic_score
 from caixa_joias.exports.excel import write_analysis_excel
 from caixa_joias.parsers.catalogo_pdf import parse_catalog_pdf
 from caixa_joias.parsers.resultado_pdf import parse_results_pdf
+from caixa_joias.parsers.history_catalogs import parse_history_catalogs
 from caixa_joias.exports.opportunity_report import build_report
 from caixa_joias.scrapers.caixa.download_history import build_history
 
@@ -267,3 +268,16 @@ def merge_catalog_results(catalog_pdf: Path, results_pdf: Path, out: Path = type
     merged['agio_vs_minimo'] = merged['lance'] / merged['valor_minimo'] - 1
     write_analysis_excel(out, {'merged': merged, 'catalog': catalog, 'results': results})
     console.print(f'Merged catalog/results exported -> {out}')
+
+@app.command("parse-history-catalogs")
+def parse_history_catalogs_command(
+    history_dir: Path = typer.Option(..., "--history-dir"),
+    out_csv: Path = typer.Option(Path("data/processed/history_catalog_lots.csv"), "--out-csv"),
+    summary_csv: Path = typer.Option(Path("data/processed/history_catalog_parse_summary.csv"), "--summary-csv"),
+) -> None:
+    parse_history_catalogs(
+        history_dir=history_dir,
+        out_csv=out_csv,
+        out_summary_csv=summary_csv,
+    )
+
