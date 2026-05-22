@@ -61,7 +61,7 @@ def extract_file_ids(item: dict[str, Any]) -> list[dict[str, str]]:
             if not isinstance(obj, dict):
                 continue
             file_id = obj.get("nome") or obj.get("id") or obj.get("arquivo")
-            tipo = obj.get("tipo") or obj.get("descricao") or "arquivo_publicado"
+            tipo = obj.get("tipoArquivo") or obj.get("tipo") or obj.get("descricao") or "arquivo_publicado"
             if file_id:
                 files.append({"tipo": str(tipo), "file_id": str(file_id)})
 
