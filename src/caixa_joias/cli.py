@@ -2,6 +2,9 @@ from __future__ import annotations
 from pathlib import Path
 import pandas as pd
 import typer
+import json
+
+from caixa_joias.scrapers.caixa.fetch_vitrine import fetch_vitrine
 from rich.console import Console
 from caixa_joias.core.pricing import add_pricing_metrics
 from caixa_joias.core.scoring import add_basic_score
@@ -100,6 +103,35 @@ def opportunities(
     )
 
     console.print(f"Opportunity report exported -> {out}")
+@app.command("fetch-vitrine")
+def fetch_vitrine_command(
+    codigo_cidade: int = typer.Option(..., "--codigo-cidade"),
+    data_inicio: str = typer.Option(..., "--data-inicio"),
+    data_fim: str | None = typer.Option(None, "--data-fim"),
+    quantidade: int = typer.Option(81, "--quantidade"),
+    out_dir: Path = typer.Option(Path("data/raw/caixa/api"), "--out-dir"),
+) -> None:
+    data_fim = data_fim or data_inicio
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    items = fetch_vitrine(
+        codigo_cidade=codigo_cidade,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        quantidade=quantidade,
+    )
+
+    raw_path = out_dir / f"vitrine_{codigo_cidade}_{data_inicio}.json"
+    csv_path = out_dir / f"vitrine_{codigo_cidade}_{data_inicio}.csv"
+
+    raw_path.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    df = pd.json_normalize(items)
+    df.to_csv(csv_path, index=False, encoding="utf-8-sig")
+
+    console.print(f"Fetched {len(items)} Vitrine rows")
+    console.print(f"JSON -> {raw_path}")
+    console.print(f"CSV  -> {csv_path}")
 @app.command()
 def merge_catalog_results(catalog_pdf: Path, results_pdf: Path, out: Path = typer.Option(..., '--out', '-o')) -> None:
     catalog = parse_catalog_pdf(catalog_pdf)
