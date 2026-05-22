@@ -6,7 +6,7 @@ import fitz
 import pandas as pd
 
 
-def read_pdf_sample(path: Path, max_pages: int = 2) -> tuple[int, str]:
+def read_pdf_sample(path: Path, max_pages: int = 10) -> tuple[int, str]:
     doc = fitz.open(path)
     page_count = doc.page_count
 
