@@ -142,8 +142,9 @@ def build_report(
         + filtered.get("noCentralizadora", pd.Series("", index=filtered.index)).fillna("").astype(str)
     )
 
-    filtered = filtered[_text_mask_contains(search_text, contains, contains_mode)]
-    filtered = filtered[_text_mask_not_contains(search_text, not_contains)]
+    include_mask = _text_mask_contains(search_text, contains, contains_mode)
+    exclude_mask = _text_mask_not_contains(search_text, not_contains)
+    filtered = filtered[include_mask & exclude_mask]
 
     if uf:
         filtered = filtered[filtered["sgUf"].fillna("").astype(str).str.upper().isin([x.upper() for x in uf])]

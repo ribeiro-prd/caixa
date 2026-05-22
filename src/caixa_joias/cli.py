@@ -8,6 +8,7 @@ from caixa_joias.core.scoring import add_basic_score
 from caixa_joias.exports.excel import write_analysis_excel
 from caixa_joias.parsers.catalogo_pdf import parse_catalog_pdf
 from caixa_joias.parsers.resultado_pdf import parse_results_pdf
+from caixa_joias.exports.opportunity_report import build_report
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -40,7 +41,65 @@ def analyze_catalog(pdf_path: Path, out: Path = typer.Option(..., '--out', '-o')
     summary = pd.DataFrame([{'source_file': pdf_path.name, 'lots': len(catalog), 'moedas': len(moedas), 'barras': len(barras), 'ouro_986': len(ouro_986), 'spot_24k': spot_24k, 'fee_rate': fee_rate, 'bid_markup': bid_markup}])
     write_analysis_excel(out, {'README': summary, 'ranking_all': scored, 'moedas': moedas, 'barras': barras, 'ouro_986': ouro_986})
     console.print(f'Analysis exported -> {out}')
+@app.command()
+def opportunities(
+    out: Path = typer.Option(Path("data/exports/opportunities.xlsx"), "--out", "-o"),
+    catalog: Path = typer.Option(Path("data/processed/catalogo.csv"), "--catalog"),
+    vitrine: Path = typer.Option(Path("data/raw/caixa/api/vitrine_9859_2026-05-22.csv"), "--vitrine"),
+    spot_24k: float = typer.Option(729.0, "--spot-24k"),
+    fee_rate: float = typer.Option(0.06, "--fee-rate"),
+    bid_markup: float = typer.Option(0.05, "--bid-markup"),
+    contains: list[str] = typer.Option([], "--contains"),
+    contains_mode: str = typer.Option("any", "--contains-mode"),
+    not_contains: list[str] = typer.Option([], "--not-contains"),
+    uf: list[str] = typer.Option([], "--uf"),
+    centralizadora: list[str] = typer.Option([], "--centralizadora"),
+    location_contains: list[str] = typer.Option([], "--location-contains"),
+    min_value: float | None = typer.Option(None, "--min-value"),
+    max_value: float | None = typer.Option(None, "--max-value"),
+    min_weight: float | None = typer.Option(None, "--min-weight"),
+    max_weight: float | None = typer.Option(None, "--max-weight"),
+    tipo: list[str] = typer.Option([], "--tipo"),
+    teor: list[float] = typer.Option([], "--teor"),
+    visibility: str = typer.Option("all", "--visibility"),
+    lote: list[str] = typer.Option([], "--lote"),
+    contrato: list[str] = typer.Option([], "--contrato"),
+    min_score: float | None = typer.Option(None, "--min-score"),
+    min_spread: float | None = typer.Option(None, "--min-spread"),
+    max_cost_fino: float | None = typer.Option(None, "--max-cost-fino"),
+    sort_by: str = typer.Option("score", "--sort-by"),
+    limit: int | None = typer.Option(None, "--limit"),
+) -> None:
+    build_report(
+        catalog_csv=catalog,
+        vitrine_csv=vitrine,
+        out_xlsx=out,
+        spot_24k=spot_24k,
+        fee_rate=fee_rate,
+        bid_markup=bid_markup,
+        contains=contains,
+        contains_mode=contains_mode,
+        not_contains=not_contains,
+        uf=uf,
+        centralizadora=centralizadora,
+        location_contains=location_contains,
+        min_value=min_value,
+        max_value=max_value,
+        min_weight=min_weight,
+        max_weight=max_weight,
+        tipo=tipo,
+        teor=teor,
+        visibility=visibility,
+        lote=lote,
+        contrato=contrato,
+        min_score=min_score,
+        min_spread=min_spread,
+        max_cost_fino=max_cost_fino,
+        sort_by=sort_by,
+        limit=limit,
+    )
 
+    console.print(f"Opportunity report exported -> {out}")
 @app.command()
 def merge_catalog_results(catalog_pdf: Path, results_pdf: Path, out: Path = typer.Option(..., '--out', '-o')) -> None:
     catalog = parse_catalog_pdf(catalog_pdf)
