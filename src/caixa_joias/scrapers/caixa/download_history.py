@@ -74,6 +74,7 @@ def extract_file_ids(item: dict[str, Any]) -> list[dict[str, str]]:
 
 def normalize_period(row: dict[str, Any]) -> tuple[str | None, str | None]:
     possible_start = [
+        "inicioLance",
         "dataInicioLance",
         "dataInicio",
         "dtInicio",
@@ -81,6 +82,7 @@ def normalize_period(row: dict[str, Any]) -> tuple[str | None, str | None]:
         "data_inicio",
     ]
     possible_end = [
+        "fimLance",
         "dataFimLance",
         "dataFim",
         "dtFim",
