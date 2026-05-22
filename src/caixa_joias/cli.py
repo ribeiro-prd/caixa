@@ -5,6 +5,7 @@ import typer
 import json
 
 from caixa_joias.scrapers.caixa.fetch_vitrine import fetch_vitrine
+from caixa_joias.scrapers.caixa.fetch_resultados import fetch_resultados_to_disk
 from rich.console import Console
 from caixa_joias.scrapers.caixa.fetch_metadata import (
     fetch_all_cidades,
@@ -288,4 +289,18 @@ def pdf_inventory_command(
     out_csv: Path = typer.Option(Path("data/processed/pdf_inventory.csv"), "--out-csv"),
 ) -> None:
     build_pdf_inventory(history_dir=history_dir, out_csv=out_csv)
+
+@app.command("fetch-resultados")
+def fetch_resultados_command(
+    codigo_cidade: int = typer.Option(..., "--codigo-cidade"),
+    data_inicio: str = typer.Option(..., "--data-inicio"),
+    data_fim: str = typer.Option(..., "--data-fim"),
+    out_dir: Path = typer.Option(Path("data/raw/caixa/resultados"), "--out-dir"),
+) -> None:
+    fetch_resultados_to_disk(
+        codigo_cidade=codigo_cidade,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        out_dir=out_dir,
+    )
 
