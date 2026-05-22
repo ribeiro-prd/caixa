@@ -108,6 +108,31 @@ def normalize_period(row: dict[str, Any]) -> tuple[str | None, str | None]:
     return br_to_iso(start), br_to_iso(end)
 
 
+
+def write_file_indexes(files_df: pd.DataFrame, out_dir: Path) -> None:
+    if files_df.empty:
+        return
+
+    priority = {"edital": 1, "catalogo": 2, "arquivo_publicado": 9}
+    files_df = files_df.copy()
+    files_df["tipo_priority"] = files_df["tipo"].map(priority).fillna(5)
+
+    lot_file_map = files_df[
+        [
+            "uf", "cidade", "codigo_cidade", "data_inicio", "data_fim",
+            "lote", "contrato", "tipo", "file_id", "download_ok", "path",
+        ]
+    ].drop_duplicates()
+
+    unique_files = (
+        files_df.sort_values(["file_id", "tipo_priority", "download_ok"], ascending=[True, True, False])
+        .drop_duplicates(subset=["file_id"], keep="first")
+        [["tipo", "file_id", "download_ok", "path"]]
+    )
+
+    lot_file_map.to_csv(out_dir / "lot_file_map.csv", index=False, encoding="utf-8-sig")
+    unique_files.to_csv(out_dir / "unique_files.csv", index=False, encoding="utf-8-sig")
+
 def build_history(
     out_dir: Path,
     ufs: list[str] | None = None,
@@ -197,7 +222,9 @@ def build_history(
 
     pd.json_normalize(all_periods).to_csv(out_dir / "periods.csv", index=False, encoding="utf-8-sig")
     pd.json_normalize(all_lots).to_csv(out_dir / "lots.csv", index=False, encoding="utf-8-sig")
-    pd.DataFrame(all_files).drop_duplicates().to_csv(out_dir / "files.csv", index=False, encoding="utf-8-sig")
+    files_df = pd.DataFrame(all_files).drop_duplicates()
+    files_df.to_csv(out_dir / "files.csv", index=False, encoding="utf-8-sig")
+    write_file_indexes(files_df, out_dir)
 
     print(f"Cities:  {len(cities)}")
     print(f"Periods: {len(all_periods)}")
