@@ -13,3 +13,5 @@ data/exports/
 *.csv
 *.pdf
 *.parquet
+# build metadata
+*.egg-info/
