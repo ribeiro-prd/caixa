@@ -12,7 +12,7 @@ from caixa_joias.core.formatting import br_money_to_float, br_weight_to_float, n
 LOT_ID_RE = re.compile(r"\b\d{4}\.\d{6}-\d\b")
 CONTRACT_RE = re.compile(r"\b\d{4}\.\d{3}\.\d{8}-\d\b")
 VALOR_RE = re.compile(r"R\$\s*(?P<valor>[\d\.\,]+)")
-PESO_RE = re.compile(r"PESO\s+LOTE:\s*(?P<peso>[\d\.,]+)\s*G", re.I)
+PESO_RE = re.compile(r"PESO\s*(?:[^:]{0,50})?\s*LOTE\s*:\s*(?P<peso>[\d\.,]+)\s*G", re.I)
 
 CATALOG_COLUMNS = [
     "source_file",
@@ -47,17 +47,20 @@ def extract_pdf_text(pdf_path: str | Path) -> str:
 
 
 def _parse_lot_block(block: str, source_file: str) -> dict | None:
-    lote_match = LOT_ID_RE.search(block)
-    contract_match = CONTRACT_RE.search(block)
-    valor_matches = list(VALOR_RE.finditer(block))
+    raw = normalize_text(block)
 
-    if not lote_match or not contract_match or not valor_matches:
+    lote_match = LOT_ID_RE.search(raw)
+    contract_match = CONTRACT_RE.search(raw)
+    valor_match = VALOR_RE.search(raw)
+
+    if not lote_match or not contract_match or not valor_match:
         return None
 
-    valor_match = valor_matches[-1]
-    desc_start = contract_match.end()
-    desc_end = valor_match.start()
-    desc = normalize_text(block[desc_start:desc_end])
+    desc = raw
+    desc = LOT_ID_RE.sub(" ", desc, count=1)
+    desc = CONTRACT_RE.sub(" ", desc, count=1)
+    desc = VALOR_RE.sub(" ", desc, count=1)
+    desc = normalize_text(desc)
 
     peso_match = PESO_RE.search(desc)
 
@@ -68,11 +71,10 @@ def _parse_lot_block(block: str, source_file: str) -> dict | None:
         "descricao": desc,
         "valor_minimo": br_money_to_float(valor_match.group("valor")),
         "peso_g": br_weight_to_float(peso_match.group("peso")) if peso_match else None,
-        "raw_text": normalize_text(block),
+        "raw_text": raw,
     }
     row.update(classify_lot(desc))
     return row
-
 
 def parse_catalog_pdf(pdf_path: str | Path) -> pd.DataFrame:
     pdf_path = Path(pdf_path)
