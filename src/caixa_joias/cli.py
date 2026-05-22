@@ -6,6 +6,13 @@ import json
 
 from caixa_joias.scrapers.caixa.fetch_vitrine import fetch_vitrine
 from rich.console import Console
+from caixa_joias.scrapers.caixa.fetch_metadata import (
+    fetch_all_cidades,
+    fetch_cidades,
+    fetch_periodos,
+    fetch_ufs,
+    save_payload,
+)
 from caixa_joias.core.pricing import add_pricing_metrics
 from caixa_joias.core.scoring import add_basic_score
 from caixa_joias.exports.excel import write_analysis_excel
@@ -29,7 +36,55 @@ def parse_results(pdf_path: Path, out: Path = typer.Option(..., '--out', '-o')) 
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False, encoding='utf-8-sig')
     console.print(f'Results parsed: {len(df)} rows -> {out}')
+@app.command("fetch-metadata")
+def fetch_metadata_command(
+    uf: list[str] = typer.Option(["SP"], "--uf"),
+    all_ufs: bool = typer.Option(False, "--all-ufs"),
+    out_dir: Path = typer.Option(Path("data/raw/caixa/metadata"), "--out-dir"),
+) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
 
+    ufs_payload = fetch_ufs()
+    save_payload(ufs_payload, out_dir / "ufs.json", out_dir / "ufs.csv")
+
+    if all_ufs:
+        cidades = fetch_all_cidades()
+        cidades_path = out_dir / "cidades_ALL.csv"
+    else:
+        cidades = fetch_all_cidades(uf)
+        cidades_path = out_dir / f"cidades_{'_'.join(x.upper() for x in uf)}.csv"
+
+    cidades.to_csv(cidades_path, index=False, encoding="utf-8-sig")
+
+    console.print(f"UF metadata -> {out_dir / 'ufs.csv'}")
+    console.print(f"Cities -> {cidades_path}")
+    console.print(f"Cities fetched: {len(cidades)}")
+@app.command("list-cities")
+def list_cities_command(
+    uf: str = typer.Option("SP", "--uf"),
+) -> None:
+    cidades = fetch_cidades(uf)
+    df = pd.json_normalize(cidades)
+
+    if df.empty:
+        console.print("No cities returned.")
+        return
+
+    console.print(df.to_string(index=False))
+
+
+@app.command("list-periods")
+def list_periods_command(
+    codigo_cidade: int = typer.Option(..., "--codigo-cidade"),
+) -> None:
+    periodos = fetch_periodos(codigo_cidade)
+    df = pd.json_normalize(periodos)
+
+    if df.empty:
+        console.print("No periods returned.")
+        return
+
+    console.print(df.to_string(index=False))
 @app.command()
 def analyze_catalog(pdf_path: Path, out: Path = typer.Option(..., '--out', '-o'), spot_24k: float = typer.Option(729.0, '--spot-24k'), fee_rate: float = typer.Option(0.06, '--fee-rate'), bid_markup: float = typer.Option(0.05, '--bid-markup')) -> None:
     catalog = parse_catalog_pdf(pdf_path)
