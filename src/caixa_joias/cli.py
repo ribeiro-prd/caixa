@@ -19,6 +19,7 @@ from caixa_joias.exports.excel import write_analysis_excel
 from caixa_joias.parsers.catalogo_pdf import parse_catalog_pdf
 from caixa_joias.parsers.resultado_pdf import parse_results_pdf
 from caixa_joias.exports.opportunity_report import build_report
+from caixa_joias.scrapers.caixa.download_history import build_history
 
 app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -241,6 +242,22 @@ def fetch_vitrine_command(
     console.print(f"Fetched {len(items)} Vitrine rows")
     console.print(f"JSON -> {raw_path}")
     console.print(f"CSV  -> {csv_path}")
+@app.command("extract-history")
+def extract_history_command(
+    uf: list[str] = typer.Option(["SP"], "--uf"),
+    all_ufs: bool = typer.Option(False, "--all-ufs"),
+    max_periods_per_city: int | None = typer.Option(None, "--max-periods-per-city"),
+    out_dir: Path = typer.Option(Path("data/raw/caixa/history"), "--out-dir"),
+) -> None:
+    selected_ufs = None if all_ufs else uf
+
+    build_history(
+        out_dir=out_dir,
+        ufs=selected_ufs,
+        max_periods_per_city=max_periods_per_city,
+    )
+
+    console.print(f"Historical extraction completed -> {out_dir}")
 @app.command()
 def merge_catalog_results(catalog_pdf: Path, results_pdf: Path, out: Path = typer.Option(..., '--out', '-o')) -> None:
     catalog = parse_catalog_pdf(catalog_pdf)
