@@ -71,7 +71,61 @@ def list_cities_command(
         return
 
     console.print(df.to_string(index=False))
+@app.command("fetch-vitrine-batch")
+def fetch_vitrine_batch_command(
+    cities_csv: Path = typer.Option(Path("data/raw/caixa/metadata/cidades_SP.csv"), "--cities-csv"),
+    data_inicio: str = typer.Option(..., "--data-inicio"),
+    data_fim: str | None = typer.Option(None, "--data-fim"),
+    quantidade: int = typer.Option(81, "--quantidade"),
+    out_dir: Path = typer.Option(Path("data/raw/caixa/api/batch"), "--out-dir"),
+) -> None:
+    data_fim = data_fim or data_inicio
+    out_dir.mkdir(parents=True, exist_ok=True)
 
+    cities = pd.read_csv(cities_csv)
+    all_rows = []
+
+    for _, city in cities.iterrows():
+        codigo = int(city["codigo"])
+        nome = str(city["nome"])
+        uf = str(city.get("siglaUf", city.get("source_uf", "")))
+
+        console.print(f"Fetching {uf} / {nome} / {codigo}")
+
+        try:
+            items = fetch_vitrine(
+                codigo_cidade=codigo,
+                data_inicio=data_inicio,
+                data_fim=data_fim,
+                quantidade=quantidade,
+            )
+        except Exception as exc:
+            console.print(f"Failed {codigo} {nome}: {exc}")
+            continue
+
+        for item in items:
+            item["source_codigo_cidade"] = codigo
+            item["source_cidade"] = nome
+            item["source_uf"] = uf
+            all_rows.append(item)
+
+        city_json = out_dir / f"vitrine_{uf}_{codigo}_{data_inicio}.json"
+        city_csv = out_dir / f"vitrine_{uf}_{codigo}_{data_inicio}.csv"
+
+        city_json.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+        pd.json_normalize(items).to_csv(city_csv, index=False, encoding="utf-8-sig")
+
+    combined_json = out_dir / f"vitrine_ALL_{data_inicio}.json"
+    combined_csv = out_dir / f"vitrine_ALL_{data_inicio}.csv"
+
+    combined_json.write_text(json.dumps(all_rows, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    df = pd.json_normalize(all_rows)
+    df.to_csv(combined_csv, index=False, encoding="utf-8-sig")
+
+    console.print(f"Fetched total rows: {len(all_rows)}")
+    console.print(f"Combined JSON -> {combined_json}")
+    console.print(f"Combined CSV  -> {combined_csv}")
 
 @app.command("list-periods")
 def list_periods_command(
