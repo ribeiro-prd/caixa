@@ -1,0 +1,2 @@
+[console_scripts]
+caixa-joias = caixa_joias.cli:app
