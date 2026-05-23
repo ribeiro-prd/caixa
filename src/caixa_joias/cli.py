@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 import pandas as pd
+from caixa_joias.analysis.resultados_analysis import parse_result_folder
 import typer
 import json
 
@@ -302,5 +303,17 @@ def fetch_resultados_command(
         data_inicio=data_inicio,
         data_fim=data_fim,
         out_dir=out_dir,
+    )
+
+@app.command("analyze-resultados")
+def analyze_resultados_command(
+    pdf_dir: Path = typer.Option(..., "--pdf-dir"),
+    out_dir: Path = typer.Option(Path("data/processed/resultados_analysis"), "--out-dir"),
+    out_xlsx: Path = typer.Option(Path("data/exports/resultados_analysis.xlsx"), "--out-xlsx"),
+) -> None:
+    parse_result_folder(
+        pdf_dir=pdf_dir,
+        out_dir=out_dir,
+        out_xlsx=out_xlsx,
     )
 
