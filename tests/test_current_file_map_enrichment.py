@@ -116,6 +116,6 @@ def test_prepare_current_adds_caixa_detail_fields_from_active_lots(tmp_path: Pat
     assert row["data_inicio_norm"] == "2026-05-25"
     assert row["caixa_lote_id"] == "509f7141-d8a9-4cca-9d7a-9543f68c3a88"
     assert row["caixa_centralizadora"] == "BAURU, SP"
-    assert row["caixa_url_imagem_frente"] == "https://vitrinedejoias.caixa.gov.br/0290/0/0290213000644210/FRENTE.JPG"
+    assert row["caixa_url_imagem_frente"] == "https://servicebus2.caixa.gov.br/vitrinearquivos/fotos/0290/0/0290213000644210/FRENTE.JPG"
     assert row["caixa_edital_url"] == "https://servicebus2.caixa.gov.br/vitrinearquivos/pdf/121202629028520260427145223.pdf"
     assert row["caixa_catalogo_url"] == "https://servicebus2.caixa.gov.br/vitrinearquivos/pdf/121202629028520260428121217.pdf"

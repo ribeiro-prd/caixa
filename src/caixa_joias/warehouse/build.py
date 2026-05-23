@@ -692,7 +692,7 @@ def _absolute_caixa_asset(value: object) -> str | None:
     if text.startswith(("http://", "https://")):
         return text
     if text.startswith("/"):
-        return "https://vitrinedejoias.caixa.gov.br" + text
+        return "https://servicebus2.caixa.gov.br/vitrinearquivos/fotos" + text
     return text
 
 
@@ -1090,6 +1090,7 @@ def build_warehouse(
         LEFT JOIN material_ratio m USING(material)
         LEFT JOIN type_ratio t USING(item_type)
         LEFT JOIN purity_ratio p USING(gold_purity)
+        WHERE TRY_CAST(c.data_fim_norm AS DATE) >= CURRENT_DATE
     """)
 
     con.execute("""

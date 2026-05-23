@@ -304,13 +304,14 @@ with tabs[0]:
 with tabs[1]:
     title("Vitrine -- Lotes Disponíveis", "Lotes abertos para lance agora. Filtre por data, UF, teor, material, preço e peso.")
 
-    ufs = get_options("current_lots", "uf")
-    cities = get_options("current_lots", "cidade")
-    types = get_options("current_lots", "item_type")
-    materials = get_options("current_lots", "material")
-    purities = get_options("current_lots", "gold_purity")
-    gems = get_options("current_lots", "gem_group")
-    summary = q("SELECT MIN(data_inicio_norm) min_d, MAX(data_fim_norm) max_d FROM current_lots").iloc[0]
+    active_source = "v_current_opportunities"
+    ufs = get_options(active_source, "uf")
+    cities = get_options(active_source, "cidade")
+    types = get_options(active_source, "item_type")
+    materials = get_options(active_source, "material")
+    purities = get_options(active_source, "gold_purity")
+    gems = get_options(active_source, "gem_group")
+    summary = q(f"SELECT MIN(data_inicio_norm) min_d, MAX(data_fim_norm) max_d FROM {active_source}").iloc[0]
 
     st.markdown('<div class="filter-card"><h3>Filtros</h3>', unsafe_allow_html=True)
     dr = date_range_input("Período do leilão", summary["min_d"], summary["max_d"])
@@ -362,7 +363,7 @@ with tabs[1]:
         "Data mais próxima": "data_inicio_norm ASC NULLS LAST",
     }[sort_order]
 
-    lots = q(f"SELECT * FROM v_current_opportunities WHERE {' AND '.join(cond)} ORDER BY {order} LIMIT 800", params)
+    lots = q(f"SELECT * FROM {active_source} WHERE {' AND '.join(cond)} ORDER BY {order} LIMIT 800", params)
     st.markdown(f"**{nfmt(len(lots))} lotes encontrados**")
     for _, row in lots.head(60).iterrows():
         lot_card(row)
