@@ -100,11 +100,16 @@ def nfmt(value) -> str:
     return f"{int(value):,}".replace(",", ".")
 
 
-def parse_date(value):
-    if value is None or pd.isna(value) or str(value) == "":
-        return None
-    return pd.to_datetime(value).date()
 
+def parse_date(value):
+    if value is None or pd.isna(value) or str(value).strip() == "":
+        return None
+
+    parsed = pd.to_datetime(str(value), errors="coerce")
+    if pd.isna(parsed):
+        return None
+
+    return parsed.date()
 
 def title(text: str, subtitle: str = ""):
     st.markdown(f"# {text}")
@@ -331,18 +336,38 @@ with tabs[2]:
     title("Histórico -- Lotes de Leilões Passados", "Resultados realizados. Compare mínimo, arrematação e prêmio real.")
 
     ufs = get_options("historical_lots", "uf")
+    cities = get_options("historical_lots", "cidade")
     types = get_options("historical_lots", "item_type")
     materials = get_options("historical_lots", "material")
     purities = get_options("historical_lots", "gold_purity")
-    summary = q("SELECT MIN(COALESCE(auction_date,catalog_date)) min_d, MAX(COALESCE(auction_date,catalog_date)) max_d FROM historical_lots").iloc[0]
+    gems = get_options("historical_lots", "gem_group")
+    summary = q("""
+        SELECT
+            COUNT(*) AS rows,
+            COUNT(DISTINCT COALESCE(auction_date,catalog_date)) AS distinct_dates,
+            COUNT(DISTINCT auction_key) AS auctions,
+            MIN(COALESCE(auction_date,catalog_date)) min_d,
+            MAX(COALESCE(auction_date,catalog_date)) max_d
+        FROM historical_lots
+    """).iloc[0]
+
+    cov1, cov2, cov3, cov4 = st.columns(4)
+    with cov1:
+        metric_card("Lotes historicos", nfmt(summary["rows"]), "catalogos processados")
+    with cov2:
+        metric_card("Datas", nfmt(summary["distinct_dates"]), f"{summary['min_d']} - {summary['max_d']}")
+    with cov3:
+        metric_card("Leiloes", nfmt(summary["auctions"]), "chaves recuperadas")
+    with cov4:
+        metric_card("Fonte", "Projeto local", "data/raw/caixa")
 
     st.markdown('<div class="filter-card"><h3>Filtros</h3>', unsafe_allow_html=True)
     dr = date_range_input("Data do leilão / publicação", summary["min_d"], summary["max_d"])
     col1, col2, col3, col4 = st.columns(4)
     sel_uf = col1.multiselect("Estado (UF)", ufs, key="hist_uf")
-    sel_type = col2.multiselect("Tipo de joia", types, key="hist_type")
-    sel_material = col3.multiselect("Material", materials, key="hist_mat")
-    sel_purity = col4.multiselect("Teor do ouro", purities, key="hist_purity")
+    sel_city = col2.multiselect("Cidade", cities, key="hist_city")
+    sel_type = col3.multiselect("Tipo de joia", types, key="hist_type")
+    sel_material = col4.multiselect("Material", materials, key="hist_mat")
     col5, col6, col7, col8 = st.columns(4)
     status = col5.selectbox("Status", ["Todos", "Vendidos", "Disponíveis/sem venda"])
     max_premium = col6.number_input("Prêmio máximo", value=5.0, step=0.25)
@@ -351,20 +376,37 @@ with tabs[2]:
     text_filter = st.text_input("Texto histórico contém", "")
     st.markdown("</div>", unsafe_allow_html=True)
 
+    col9, col10, col11, col12 = st.columns(4)
+    sel_purity = col9.multiselect("Teor do ouro", purities, key="hist_purity")
+    sel_gems = col10.multiselect("Gemas", gems, key="hist_gems")
+    max_weight = col11.number_input("Peso maximo (0 = sem limite)", value=0.0, step=1.0, key="hist_weight_max")
+    min_value = col12.number_input("Valor minimo", value=0.0, step=100.0, key="hist_value_min")
+    max_value = st.number_input("Valor maximo (0 = sem limite)", value=0.0, step=100.0, key="hist_value_max")
+
     cond = ["1=1"]
-    params = {"max_premium": max_premium, "min_weight": min_weight}
+    params = {"max_premium": max_premium, "min_weight": min_weight, "min_value": min_value}
     if dr and len(dr) == 2:
         cond.append("TRY_CAST(COALESCE(auction_date,catalog_date) AS DATE) BETWEEN $start_date AND $end_date")
         params["start_date"] = str(dr[0])
         params["end_date"] = str(dr[1])
-    for expr in [sql_in("uf", sel_uf), sql_in("item_type", sel_type), sql_in("material", sel_material), sql_in("gold_purity", sel_purity)]:
+    for expr in [sql_in("uf", sel_uf), sql_in("cidade", sel_city), sql_in("item_type", sel_type), sql_in("material", sel_material), sql_in("gold_purity", sel_purity), sql_in("gem_group", sel_gems)]:
         if expr:
             cond.append(expr)
     if status == "Vendidos":
         cond.append("sold = true")
     elif status == "Disponíveis/sem venda":
         cond.append("sold = false")
-    cond += ["(premium_vs_minimo <= $max_premium OR premium_vs_minimo IS NULL)", "(peso_g >= $min_weight OR peso_g IS NULL)"]
+    cond += [
+        "(premium_vs_minimo <= $max_premium OR premium_vs_minimo IS NULL)",
+        "(peso_g >= $min_weight OR peso_g IS NULL)",
+        "(valor_minimo >= $min_value OR valor_minimo IS NULL)",
+    ]
+    if max_weight > 0:
+        cond.append("(peso_g <= $max_weight OR peso_g IS NULL)")
+        params["max_weight"] = max_weight
+    if max_value > 0:
+        cond.append("(valor_minimo <= $max_value OR valor_minimo IS NULL)")
+        params["max_value"] = max_value
     if text_filter.strip():
         cond.append("UPPER(COALESCE(descricao,'')) LIKE '%' || UPPER($text_filter) || '%'")
         params["text_filter"] = text_filter.strip()
@@ -376,13 +418,14 @@ with tabs[2]:
     }[sort_hist]
 
     hist = q(f"""
-        SELECT uf,cidade,COALESCE(auction_date,catalog_date) AS data,lote,contrato,item_type,material,gold_purity,gem_group,
+        SELECT uf,cidade,COALESCE(auction_date,catalog_date) AS data,co_leilao,lote,contrato,item_type,material,gold_purity,gem_group,
                valor_minimo,lance,total,peso_g,premium_vs_minimo,total_por_g,sold,descricao
         FROM historical_lots
         WHERE {' AND '.join(cond)}
         ORDER BY {order}
         LIMIT 3000
     """, params)
+    st.caption(f"{nfmt(len(hist))} linhas exibidas (limite 3.000)")
     st.dataframe(hist, use_container_width=True, hide_index=True)
 
 
