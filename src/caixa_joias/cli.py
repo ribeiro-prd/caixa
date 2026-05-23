@@ -1,12 +1,13 @@
 from __future__ import annotations
 from pathlib import Path
 import pandas as pd
+from caixa_joias.warehouse.build import build_warehouse
 from caixa_joias.analysis.resultados_analysis import parse_result_folder
 import typer
 import json
 
 from caixa_joias.scrapers.caixa.fetch_vitrine import fetch_vitrine
-from caixa_joias.scrapers.caixa.fetch_resultados import fetch_resultados_to_disk
+from caixa_joias.scrapers.caixa.fetch_resultados import fetch_resultados_batch_to_disk, fetch_resultados_to_disk
 from rich.console import Console
 from caixa_joias.scrapers.caixa.fetch_metadata import (
     fetch_all_cidades,
@@ -315,5 +316,42 @@ def analyze_resultados_command(
         pdf_dir=pdf_dir,
         out_dir=out_dir,
         out_xlsx=out_xlsx,
+    )
+
+@app.command("build-warehouse")
+def build_warehouse_command(
+    processed_dir: Path = typer.Option(Path("data/processed"), "--processed-dir"),
+    raw_dir: Path = typer.Option(Path("data/raw/caixa"), "--raw-dir"),
+    out_db: Path = typer.Option(Path("data/warehouse/caixa_joias.duckdb"), "--out-db"),
+    out_exports_dir: Path = typer.Option(Path("data/exports/warehouse"), "--out-exports-dir"),
+) -> None:
+    build_warehouse(
+        processed_dir=processed_dir,
+        raw_dir=raw_dir,
+        out_db=out_db,
+        out_exports_dir=out_exports_dir,
+    )
+
+
+@app.command("serve")
+def serve_command(
+    app_path: Path = typer.Option(Path("src/caixa_joias/dashboard/app.py"), "--app-path"),
+) -> None:
+    import subprocess
+    import sys
+    subprocess.run([sys.executable, "-m", "streamlit", "run", str(app_path)], check=False)
+
+@app.command("fetch-resultados-batch")
+def fetch_resultados_batch_command(
+    cities_csv: Path = typer.Option(..., "--cities-csv"),
+    data_inicio: str = typer.Option(..., "--data-inicio"),
+    data_fim: str = typer.Option(..., "--data-fim"),
+    out_dir: Path = typer.Option(Path("data/raw/caixa/resultados_all"), "--out-dir"),
+) -> None:
+    fetch_resultados_batch_to_disk(
+        cities_csv=cities_csv,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        out_dir=out_dir,
     )
 

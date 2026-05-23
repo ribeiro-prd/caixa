@@ -178,3 +178,101 @@ if __name__ == "__main__":
         data_fim="2026-05-22",
         out_dir="data/raw/caixa/resultados_sp",
     )
+def fetch_resultados_batch_to_disk(
+    cities_csv: str | Path,
+    data_inicio: str,
+    data_fim: str,
+    out_dir: str | Path,
+) -> None:
+    cities_csv = Path(cities_csv)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    cities = pd.read_csv(cities_csv)
+    all_file_rows = []
+    all_payload_rows = []
+
+    for _, city in cities.iterrows():
+        codigo = int(city["codigo"])
+        cidade = str(city["nome"])
+        uf = str(city.get("siglaUf", city.get("source_uf", "")))
+
+        print(f"Fetching resultados {uf}/{cidade}/{codigo}: {data_inicio} to {data_fim}")
+
+        city_dir = out_dir / "raw_json"
+        city_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            payload = fetch_resultados(
+                codigo_cidade=codigo,
+                data_inicio=data_inicio,
+                data_fim=data_fim,
+            )
+        except Exception as exc:
+            all_payload_rows.append(
+                {
+                    "uf": uf,
+                    "cidade": cidade,
+                    "codigo_cidade": codigo,
+                    "status": f"error: {exc}",
+                    "raw_json_path": None,
+                }
+            )
+            print(f"  ERROR {uf}/{cidade}/{codigo}: {exc}")
+            continue
+
+        raw_path = city_dir / f"resultados_{uf}_{codigo}_{data_inicio}_{data_fim}.json"
+        raw_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        all_payload_rows.append(
+            {
+                "uf": uf,
+                "cidade": cidade,
+                "codigo_cidade": codigo,
+                "status": "ok",
+                "raw_json_path": str(raw_path),
+            }
+        )
+
+        files = extract_download_files(payload)
+
+        if files.empty:
+            print("  No files")
+            continue
+
+        for _, row in files.iterrows():
+            file_id = str(row["file_id"])
+            file_name = str(row["file_name"])
+
+            path = download_result_file(
+                file_id=file_id,
+                file_name=file_name,
+                out_dir=out_dir / "pdf",
+            )
+
+            all_file_rows.append(
+                {
+                    "uf": uf,
+                    "cidade": cidade,
+                    "codigo_cidade": codigo,
+                    "data_inicio": data_inicio,
+                    "data_fim": data_fim,
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "download_ok": path is not None,
+                    "path": str(path) if path else None,
+                }
+            )
+
+        print(f"  Files found: {len(files)}")
+
+    payloads_df = pd.DataFrame(all_payload_rows)
+    files_df = pd.DataFrame(all_file_rows)
+
+    payloads_df.to_csv(out_dir / "batch_payloads.csv", index=False, encoding="utf-8-sig")
+    files_df.to_csv(out_dir / "batch_result_files.csv", index=False, encoding="utf-8-sig")
+
+    print(f"Cities processed: {len(cities)}")
+    print(f"File rows: {len(files_df)}")
+    print(f"Downloaded OK: {files_df['download_ok'].sum() if not files_df.empty else 0}")
+    print(f"Output -> {out_dir}")
