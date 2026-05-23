@@ -1,0 +1,29 @@
+Starting post-scrape processing: Fri, May 22, 2026 10:04:56 PM
+
+1) Analyze all historical result PDFs
+catalog rows: 125923
+result rows: 14069
+merged rows: 14069
+matched catalog: 14069
+buyers: 54
+Excel -> data\exports\resultados_all_2025_analysis.xlsx
+
+2) Parse current active catalogs
+Parsed catalog rows: 21466
+Summary rows: 46
+Output: data\processed\current_all_active_catalog_lots.csv
+Summary: data\processed\current_all_active_catalog_parse_summary.csv
+
+3) Generate current active opportunity report
+Opportunity report exported -> 
+data\exports\current_all_active_opportunities.xlsx
+
+4) Generate current active heavy-lot opportunity report
+Opportunity report exported -> 
+data\exports\current_all_active_opportunities_20g_plus.xlsx
+
+5) Build local DuckDB warehouse
+DuckDB -> data\warehouse\caixa_joias.duckdb
+Exports -> data\exports\warehouse
+
+Finished post-scrape processing: Fri, May 22, 2026 10:51:51 PM
