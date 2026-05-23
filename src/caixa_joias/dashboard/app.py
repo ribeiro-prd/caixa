@@ -384,6 +384,10 @@ with tabs[2]:
             COUNT(*) AS rows,
             COUNT(DISTINCT COALESCE(auction_date,catalog_date)) AS distinct_dates,
             COUNT(DISTINCT auction_key) AS auctions,
+            COUNT(DISTINCT auction_key) FILTER (WHERE auction_has_results) AS auctions_with_results,
+            COUNT(*) FILTER (WHERE sold) AS sold_rows,
+            COUNT(*) FILTER (WHERE sale_status = 'nao vendido') AS unsold_rows,
+            COUNT(*) FILTER (WHERE sale_status = 'sem resultado coletado') AS unknown_rows,
             MIN(COALESCE(auction_date,catalog_date)) min_d,
             MAX(COALESCE(auction_date,catalog_date)) max_d
         FROM historical_lots
@@ -395,9 +399,9 @@ with tabs[2]:
     with cov2:
         metric_card("Datas", nfmt(summary["distinct_dates"]), f"{summary['min_d']} - {summary['max_d']}")
     with cov3:
-        metric_card("Leiloes", nfmt(summary["auctions"]), "chaves recuperadas")
+        metric_card("Leiloes", nfmt(summary["auctions"]), f"{nfmt(summary['auctions_with_results'])} com resultado")
     with cov4:
-        metric_card("Fonte", "Projeto local", "data/raw/caixa")
+        metric_card("Cobertura", nfmt(summary["sold_rows"]), f"{nfmt(summary['unknown_rows'])} sem resultado")
 
     st.markdown('<div class="filter-card"><h3>Filtros</h3>', unsafe_allow_html=True)
     dr = date_range_input("Data do leilão / publicação", summary["min_d"], summary["max_d"])
@@ -407,7 +411,7 @@ with tabs[2]:
     sel_type = col3.multiselect("Tipo de joia", types, key="hist_type")
     sel_material = col4.multiselect("Material", materials, key="hist_mat")
     col5, col6, col7, col8 = st.columns(4)
-    status = col5.selectbox("Status", ["Todos", "Vendidos", "Disponíveis/sem venda"])
+    status = col5.selectbox("Status", ["Todos", "Vendidos", "Nao vendidos (com resultado)", "Sem resultado coletado"])
     max_premium = col6.number_input("Prêmio máximo", value=5.0, step=0.25)
     min_weight = col7.number_input("Peso mínimo", value=0.0, step=1.0, key="hist_weight")
     sort_hist = col8.selectbox("Ordenar por", ["Preço maior", "Prêmio menor", "R$/g menor", "Data recente"])
@@ -432,8 +436,10 @@ with tabs[2]:
             cond.append(expr)
     if status == "Vendidos":
         cond.append("sold = true")
-    elif status == "Disponíveis/sem venda":
-        cond.append("sold = false")
+    elif status == "Nao vendidos (com resultado)":
+        cond.append("sale_status = 'nao vendido'")
+    elif status == "Sem resultado coletado":
+        cond.append("sale_status = 'sem resultado coletado'")
     cond += [
         "(premium_vs_minimo <= $max_premium OR premium_vs_minimo IS NULL)",
         "(peso_g >= $min_weight OR peso_g IS NULL)",
@@ -457,7 +463,7 @@ with tabs[2]:
 
     hist = q(f"""
         SELECT uf,cidade,COALESCE(auction_date,catalog_date) AS data,co_leilao,lote,contrato,item_type,material,gold_purity,gem_group,
-               valor_minimo,lance,total,peso_g,premium_vs_minimo,total_por_g,sold,descricao
+               valor_minimo,lance,total,peso_g,premium_vs_minimo,total_por_g,sold,sale_status,auction_has_results,descricao
         FROM historical_lots
         WHERE {' AND '.join(cond)}
         ORDER BY {order}

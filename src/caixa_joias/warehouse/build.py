@@ -559,7 +559,13 @@ def _prepare_historical(processed: Path, raw: Path, lances: pd.DataFrame) -> pd.
     df = _str_keys(df, ["auction_key", "lote", "contrato"])
     df = _features(df)
     df = df.sort_values(["auction_key", "lote", "catalog_ts"]).drop_duplicates(["auction_key", "lote"], keep="last")
+    result_auction_keys: set[str] = set()
+    if not file_map.empty and {"tipo_arquivo", "codigo_centralizadora", "co_leilao", "dt_inicio"}.issubset(file_map.columns):
+        result_files = file_map[file_map["tipo_arquivo"].fillna("").str.contains("resultado|cpf|cnpj", case=False, regex=True)]
+        result_keys = _auction_key_from_metadata(result_files)
+        result_auction_keys.update(result_keys.dropna().astype(str))
     if not lances.empty:
+        result_auction_keys.update(lances["auction_key"].dropna().astype(str))
         sold = lances[["auction_key", "lote", "lance", "total", "premium_vs_minimo", "total_por_g", "cpf_cnpj_mascarado", "auction_date"]].copy()
         sold = _str_keys(sold, ["auction_key", "lote"])
         sold["sold"] = True
@@ -567,6 +573,10 @@ def _prepare_historical(processed: Path, raw: Path, lances: pd.DataFrame) -> pd.
         df["sold"] = df["sold"].fillna(False)
     else:
         df["sold"] = False
+    df["auction_has_results"] = df["auction_key"].isin(result_auction_keys)
+    df["sale_status"] = "sem resultado coletado"
+    df.loc[df["auction_has_results"] & ~df["sold"], "sale_status"] = "nao vendido"
+    df.loc[df["sold"], "sale_status"] = "vendido"
     return df
 
 

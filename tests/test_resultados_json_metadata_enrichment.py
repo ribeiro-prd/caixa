@@ -34,6 +34,16 @@ def test_resultados_json_file_map_recovers_auction_dates(tmp_path: Path) -> None
               {"nome": "0012026121220260130105426", "tipoArquivo": "Ata"},
               {"nome": "0012026121220260129135818", "tipoArquivo": "Catalogo"}
             ]
+          },
+          {
+            "coLeilao": "003/2026",
+            "codigoCentralizadora": "0012",
+            "dtInicio": "06/02/2026",
+            "dtFim": "06/02/2026",
+            "noUnidade": "BELO HORIZONTE",
+            "arquivosPublicados": [
+              {"nome": "0012026121220260205135818", "tipoArquivo": "Catalogo"}
+            ]
           }
         ]
         """,
@@ -42,8 +52,8 @@ def test_resultados_json_file_map_recovers_auction_dates(tmp_path: Path) -> None
 
     file_map = _resultados_file_map(raw)
 
-    assert set(file_map["dt_inicio"]) == {"2026-01-23", "2026-01-30"}
-    assert set(file_map["co_leilao"]) == {"001/2026", "002/2026"}
+    assert set(file_map["dt_inicio"]) == {"2026-01-23", "2026-01-30", "2026-02-06"}
+    assert set(file_map["co_leilao"]) == {"001/2026", "002/2026", "003/2026"}
 
 
 def test_prepare_historical_and_lances_prefer_resultados_json_dates(tmp_path: Path) -> None:
@@ -77,6 +87,16 @@ def test_prepare_historical_and_lances_prefer_resultados_json_dates(tmp_path: Pa
             "arquivosPublicados": [
               {"nome": "0012026121220260130105426", "tipoArquivo": "Ata"},
               {"nome": "0012026121220260129135818", "tipoArquivo": "Catalogo"}
+            ]
+          },
+          {
+            "coLeilao": "003/2026",
+            "codigoCentralizadora": "0012",
+            "dtInicio": "06/02/2026",
+            "dtFim": "06/02/2026",
+            "noUnidade": "BELO HORIZONTE",
+            "arquivosPublicados": [
+              {"nome": "0012026121220260205135818", "tipoArquivo": "Catalogo"}
             ]
           }
         ]
@@ -133,6 +153,14 @@ def test_prepare_historical_and_lances_prefer_resultados_json_dates(tmp_path: Pa
                 "valor_minimo": 2000,
                 "peso_g": 20,
             },
+            {
+                "pdf_path": "data/raw/caixa/resultados_all_2025/pdf/0012026121220260205135818.pdf",
+                "lote": "0012.000003-2",
+                "contrato": "C",
+                "descricao": "UMA PULSEIRA DE OURO, PESO LOTE: 30,00G",
+                "valor_minimo": 3000,
+                "peso_g": 30,
+            },
         ]
     ).to_csv(analysis / "resultados_catalog_lots.csv", index=False)
 
@@ -140,5 +168,9 @@ def test_prepare_historical_and_lances_prefer_resultados_json_dates(tmp_path: Pa
     historical = _prepare_historical(processed, raw, lances)
 
     assert set(lances["auction_date"]) == {"2026-01-23", "2026-01-30"}
-    assert set(historical["catalog_date"]) == {"2026-01-23", "2026-01-30"}
+    assert set(historical["catalog_date"]) == {"2026-01-23", "2026-01-30", "2026-02-06"}
     assert set(lances["auction_key"]) == {"0012|001/2026|2026-01-23", "0012|002/2026|2026-01-30"}
+    assert set(historical.loc[historical["sold"], "sale_status"]) == {"vendido"}
+    unknown = historical.loc[historical["auction_key"] == "0012|003/2026|2026-02-06"].iloc[0]
+    assert not bool(unknown["auction_has_results"])
+    assert unknown["sale_status"] == "sem resultado coletado"
