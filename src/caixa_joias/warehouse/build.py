@@ -682,6 +682,20 @@ def _fill_from_candidates(df: pd.DataFrame, target: str, candidates: list[str]) 
     return df
 
 
+def _absolute_caixa_asset(value: object) -> str | None:
+    if value is None or pd.isna(value):
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.startswith(("http://", "https://")):
+        return text
+    if text.startswith("/"):
+        return "https://vitrinedejoias.caixa.gov.br" + text
+    return text
+
+
 
 def _prepare_current(processed: Path, raw: Path) -> pd.DataFrame:
     path = _first_existing([
@@ -728,6 +742,10 @@ def _prepare_current(processed: Path, raw: Path) -> pd.DataFrame:
                 "codigo_cidade", "codigoCidade", "codigo", "source_codigo_cidade",
                 "data_inicio", "dataInicio", "dataInicioLance", "inicioLance", "source_data_inicio",
                 "data_fim", "dataFim", "dataFimLance", "fimLance", "source_data_fim",
+                "id", "coLeilao", "dataDivulgacao", "dataResultado", "dataDeLance",
+                "deContrato", "deLocalEndereco", "noCentralizadora", "edital", "catalogo",
+                "valor", "urlImagemCapa", "urlImagemFrente", "urlImagemFrenteP",
+                "urlImagemVerso", "urlImagemVersoP", "sgUf",
                 "source_json_path",
             ]:
                 if c in meta.columns:
@@ -741,6 +759,22 @@ def _prepare_current(processed: Path, raw: Path) -> pd.DataFrame:
             df = _fill_from_candidates(df, "codigo_cidade", ["codigo_cidade_active", "codigoCidade", "codigo", "source_codigo_cidade"])
             df = _fill_from_candidates(df, "data_inicio", ["data_inicio_active", "dataInicio", "dataInicioLance", "inicioLance", "source_data_inicio"])
             df = _fill_from_candidates(df, "data_fim", ["data_fim_active", "dataFim", "dataFimLance", "fimLance", "source_data_fim"])
+            df = _fill_from_candidates(df, "caixa_lote_id", ["id"])
+            df = _fill_from_candidates(df, "caixa_leilao", ["coLeilao"])
+            df = _fill_from_candidates(df, "caixa_data_divulgacao", ["dataDivulgacao"])
+            df = _fill_from_candidates(df, "caixa_data_resultado", ["dataResultado"])
+            df = _fill_from_candidates(df, "caixa_data_lance", ["dataDeLance"])
+            df = _fill_from_candidates(df, "caixa_descricao", ["deContrato"])
+            df = _fill_from_candidates(df, "caixa_local_retirada", ["deLocalEndereco"])
+            df = _fill_from_candidates(df, "caixa_centralizadora", ["noCentralizadora"])
+            df = _fill_from_candidates(df, "caixa_edital_file_id", ["edital"])
+            df = _fill_from_candidates(df, "caixa_catalogo_file_id", ["catalogo"])
+            df = _fill_from_candidates(df, "caixa_valor", ["valor"])
+            df = _fill_from_candidates(df, "caixa_url_imagem_capa", ["urlImagemCapa"])
+            df = _fill_from_candidates(df, "caixa_url_imagem_frente", ["urlImagemFrente"])
+            df = _fill_from_candidates(df, "caixa_url_imagem_frente_p", ["urlImagemFrenteP"])
+            df = _fill_from_candidates(df, "caixa_url_imagem_verso", ["urlImagemVerso"])
+            df = _fill_from_candidates(df, "caixa_url_imagem_verso_p", ["urlImagemVersoP"])
 
             df = df.drop(columns=[c for c in ["_lot_key", "_contract_key"] if c in df.columns])
 
@@ -759,6 +793,24 @@ def _prepare_current(processed: Path, raw: Path) -> pd.DataFrame:
     for col in ["lote", "contrato"]:
         if col in df.columns:
             df[col] = df[col].astype("string").fillna("")
+
+    for col in [
+        "caixa_url_imagem_capa", "caixa_url_imagem_frente", "caixa_url_imagem_frente_p",
+        "caixa_url_imagem_verso", "caixa_url_imagem_verso_p",
+    ]:
+        if col in df.columns:
+            df[col] = df[col].apply(_absolute_caixa_asset)
+
+    if "caixa_lote_id" in df.columns:
+        df["caixa_search_url"] = "https://vitrinedejoias.caixa.gov.br/Paginas/Busca.aspx"
+    if "caixa_edital_file_id" in df.columns:
+        df["caixa_edital_url"] = df["caixa_edital_file_id"].apply(
+            lambda x: f"https://servicebus2.caixa.gov.br/vitrinearquivos/pdf/{x}.pdf" if pd.notna(x) and str(x).strip() else None
+        )
+    if "caixa_catalogo_file_id" in df.columns:
+        df["caixa_catalogo_url"] = df["caixa_catalogo_file_id"].apply(
+            lambda x: f"https://servicebus2.caixa.gov.br/vitrinearquivos/pdf/{x}.pdf" if pd.notna(x) and str(x).strip() else None
+        )
 
     df = _add_features(df)
     df["minimo_por_g"] = df["valor_minimo"] / df["peso_g"]
@@ -1017,7 +1069,7 @@ def build_warehouse(
                (COALESCE(m.expected_material_ratio,1.50)+COALESCE(t.expected_type_ratio,1.50)+COALESCE(p.expected_purity_ratio,1.50))/3 AS expected_ratio,
                c.valor_minimo*((COALESCE(m.expected_material_ratio,1.50)+COALESCE(t.expected_type_ratio,1.50)+COALESCE(p.expected_purity_ratio,1.50))/3) AS expected_bid,
                c.minimo_por_g AS current_min_per_g,
-            'https://vitrinedejoias.caixa.gov.br/Paginas/Busca.aspx' AS caixa_search_url,
+            COALESCE(c.caixa_search_url, 'https://vitrinedejoias.caixa.gov.br/Paginas/Busca.aspx') AS caixa_oficial_url,
             COALESCE(c.uf, '') || ' ' || COALESCE(c.cidade, '') || ' lote ' || COALESCE(c.lote, '') || ' contrato ' || COALESCE(c.contrato, '') AS caixa_lookup_text,
                CASE WHEN UPPER(COALESCE(c.descricao,'')) LIKE '%OURO%'
                          AND UPPER(COALESCE(c.descricao,'')) NOT LIKE '%RELÓGIO%'

@@ -167,11 +167,45 @@ def sql_in(col: str, values: list[str]) -> str | None:
     return f"{col} IN ({vals})"
 
 
+def link_button(label: str, url: object) -> str:
+    if url is None or pd.isna(url) or not str(url).strip():
+        return ""
+
+    return f'<a class="badge blue" href="{str(url)}" target="_blank" rel="noopener noreferrer">{label}</a>'
+
+
 def lot_card(row):
     cls = "good" if row.get("clean_gold_flag") == 1 else ""
+    image_url = row.get("caixa_url_imagem_frente") or row.get("caixa_url_imagem_capa")
+    image_html = ""
+    if image_url is not None and not pd.isna(image_url) and str(image_url).strip():
+        image_html = f'<img src="{image_url}" style="width:148px;max-height:116px;object-fit:contain;border:1px solid #eee;border-radius:8px;background:white;margin:0 14px 8px 0;float:left">'
+
+    official_url = row.get("caixa_oficial_url") or row.get("caixa_search_url") or "https://vitrinedejoias.caixa.gov.br/Paginas/Busca.aspx"
+    links = " ".join(
+        x
+        for x in [
+            link_button("Abrir busca CAIXA", official_url),
+            link_button("Baixar edital", row.get("caixa_edital_url")),
+            link_button("Baixar catalogo", row.get("caixa_catalogo_url")),
+        ]
+        if x
+    )
+    caixa_detail = ""
+    if row.get("caixa_lote_id") is not None and not pd.isna(row.get("caixa_lote_id")):
+        caixa_detail = f"""
+          <div class="small-note" style="margin-top:8px">
+            <b>Centralizadora:</b> {row.get('caixa_centralizadora','')} &nbsp;
+            <b>Resultado:</b> {row.get('caixa_data_resultado','')}<br>
+            <b>Retirada:</b> {row.get('caixa_local_retirada','')}<br>
+            <b>ID CAIXA:</b> {row.get('caixa_lote_id','')}<br>
+            <b>Buscar:</b> {row.get('caixa_lookup_text','')}
+          </div>
+        """
     st.markdown(
         f"""
         <div class="lot-card {cls}">
+          {image_html}
           <div class="lot-title">{str(row.get('item_type','lote')).title()} <span style="float:right">{brl(row.get('valor_minimo'))}</span></div>
           <div class="lot-sub">{row.get('lote','')} • {row.get('contrato','')} • {row.get('cidade','')}, {row.get('uf','')} • {row.get('data_inicio_norm','')} a {row.get('data_fim_norm','')}</div>
           <div>
@@ -184,7 +218,10 @@ def lot_card(row):
             <span class="badge green">score {int(row.get('opportunity_score') or 0)}</span>
             <span class="badge">esperado {ratio(row.get('expected_ratio'))}</span>
           </div>
+          <div style="margin-top:9px">{links}</div>
           <div style="margin-top:9px;color:#555">{str(row.get('descricao',''))[:360]}</div>
+          {caixa_detail}
+          <div style="clear:both"></div>
         </div>
         """,
         unsafe_allow_html=True,
